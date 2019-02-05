@@ -128,7 +128,52 @@ class KnowledgeBase(object):
         printv("Retracting {!r}", 0, verbose, [fact])
         ####################################################
         # Student code goes here
-        
+        if isinstance(fact, Fact):
+            unsupported = False
+            f = self._get_fact(fact)
+            if f.asserted:
+                f.asserted = False
+                if len(f.supported_by) == 0:
+                    unsupported = True
+            else:
+                if len(f.supported_by) == 0:
+                    unsupported = True
+            if unsupported:
+                for i in f.supports_facts:
+                    for j in i.supported_by:
+                        i.supported_by.remove(j)
+                    if len(i.supported_by) == 0:
+                        self.kb_retract(i)
+
+                for k in f.supports_rules:
+                    for l in k.supported_by:
+                        k.supported_by.remove(l)
+                    if len(k.supported_by) == 0:
+                        self.kb_retract(k)
+                self.facts.remove(f)
+
+        elif isinstance(fact, Rule):
+            unsupported = False
+            if fact in self.rules:
+                r = self._get_rule(fact)
+                if len(r.supported_by) == 0 and not r.asserted:
+                    unsupported = True
+                if unsupported:
+                    for i in r.supports_facts:
+                        for j in i.supported_by:
+                            i.supported_by.remove(j)
+                        if len(i.supported_by) == 0:
+                            self.kb_retract(i)
+
+                    for k in r.supports_rules:
+                        for l in k.supported_by:
+                            k.supported_by.remove(l)
+                        if len(k.supported_by) == 0:
+                            self.kb_retract(k)
+                    self.rules.remove(r)
+
+        else:
+            print("input is not a fact or rule")
 
 class InferenceEngine(object):
     def fc_infer(self, fact, rule, kb):
@@ -146,3 +191,34 @@ class InferenceEngine(object):
             [fact.statement, rule.lhs, rule.rhs])
         ####################################################
         # Student code goes here
+        b = match(fact.statement, rule.lhs[0])
+        if b:
+            l = len(rule.lhs)
+            if l > 1:
+                new_lhs = []
+                for i in range(l-1):
+                    new_lhs.append(instantiate(rule.lhs[i+1], b))
+
+                n_rule = Rule([new_lhs, instantiate(rule.rhs, b)])
+                #supported_by
+                n_rule.supported_by.append([fact, rule])
+                #supports
+                rule.supports_rules.append(n_rule)
+                fact.supports_rules.append(n_rule)
+                #added
+                n_rule.asserted = False
+                kb.kb_assert(n_rule)
+
+            else:
+                n_fact = Fact(instantiate(rule.rhs, b))
+                #supported_by
+                n_fact.supported_by.append([fact, rule])
+                #supports
+                fact.supports_facts.append(n_fact)
+                rule.supports_facts.append(n_fact)
+                #added
+                kb.kb_assert(n_fact)
+                n_fact.asserted = False
+
+
+
